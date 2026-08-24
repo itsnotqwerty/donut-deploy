@@ -19,6 +19,9 @@ server {
     listen [::]:443 ssl;
     server_name __SERVER_NAME__;
 
+    client_max_body_size __CLIENT_MAX_BODY_SIZE__;
+    large_client_header_buffers 4 64k;
+
     ssl_certificate __SSL_CERTIFICATE__;
     ssl_certificate_key __SSL_CERTIFICATE_KEY__;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -27,6 +30,9 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:__PORT__;
+        proxy_buffer_size 64k;
+        proxy_buffers 4 64k;
+        proxy_busy_buffers_size 128k;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
