@@ -334,7 +334,9 @@ render_service() {
   content="${content//__APP_DIR__/$project_dir}"
   content="${content//__PORT__/$port}"
   content="${content//__ENV_FILE__/$env_dest}"
+  content="${content//__CONFIG_DIR__/$env_dir}"
   content="${content//__START_COMMAND__/$start_command}"
+  content="${content//__HEALTH_CHECK__/}"
   printf '%s\n' "$content" > "$rendered_service"
 }
 
