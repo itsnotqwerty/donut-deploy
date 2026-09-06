@@ -17,8 +17,10 @@ Application:
   -g, --group GROUP       Service group (default: service user's primary group)
   --description TEXT      Systemd description (default: <name> web application)
   -p, --port PORT         Local application port (default: 8000)
+  --port-env NAME         Additional environment variable receiving the port (repeatable)
   -e, --env FILE          Environment file to copy into project-owned /etc storage
   --config-root PATH      Application config root (default: /etc)
+  --read-write-path PATH  Additional writable path for the service (repeatable)
   --skip-build            Do not run the detected Fresh production build
 
 Nginx and TLS:
@@ -62,8 +64,10 @@ project_dir=""
 app_user=""
 app_group=""
 port="8000"
+port_env_names=()
 env_source=""
 config_root="/etc"
+read_write_paths=()
 server_name="localhost"
 ssl_certificate=""
 ssl_certificate_key=""
@@ -116,6 +120,11 @@ while [[ $# -gt 0 ]]; do
       port="$2"
       shift 2
       ;;
+    --port-env)
+      require_value "$@"
+      port_env_names+=("$2")
+      shift 2
+      ;;
     -e|--env)
       require_value "$@"
       env_source="$2"
@@ -124,6 +133,11 @@ while [[ $# -gt 0 ]]; do
     --config-root)
       require_value "$@"
       config_root="$2"
+      shift 2
+      ;;
+    --read-write-path)
+      require_value "$@"
+      read_write_paths+=("$2")
       shift 2
       ;;
     --skip-build)
@@ -210,6 +224,18 @@ if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
   echo "--port must be an integer between 1 and 65535." >&2
   exit 2
 fi
+for port_env_name in "${port_env_names[@]}"; do
+  if [[ ! "$port_env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "--port-env must be a valid environment variable name: $port_env_name" >&2
+    exit 2
+  fi
+done
+for read_write_path in "${read_write_paths[@]}"; do
+  if [[ "$read_write_path" != /* || "$read_write_path" == *[[:space:]]* ]]; then
+    echo "--read-write-path must be an absolute path without whitespace: $read_write_path" >&2
+    exit 2
+  fi
+done
 if [[ "$start_command" != /* ]]; then
   echo "--command must begin with an absolute executable path." >&2
   exit 2
@@ -326,15 +352,23 @@ rendered_service="${work_dir}/${app_name}.service"
 rendered_nginx="${work_dir}/${app_name}.conf"
 
 render_service() {
-  local content
+  local content port_environment read_write_paths_value
   content="$(<"$service_template")"
+  port_environment="Environment=PORT=${port}"
+  for port_env_name in "${port_env_names[@]}"; do
+    port_environment+=$'\n'"Environment=${port_env_name}=${port}"
+  done
+  read_write_paths_value="${env_dir} -/var/lib/${app_name} -/var/backups/${app_name}"
+  for read_write_path in "${read_write_paths[@]}"; do
+    read_write_paths_value+=" ${read_write_path}"
+  done
   content="${content//__DESCRIPTION__/$description}"
   content="${content//__APP_USER__/$app_user}"
   content="${content//__APP_GROUP__/$app_group}"
   content="${content//__APP_DIR__/$project_dir}"
-  content="${content//__PORT__/$port}"
+  content="${content//__PORT_ENVIRONMENT__/$port_environment}"
   content="${content//__ENV_FILE__/$env_dest}"
-  content="${content//__CONFIG_DIR__/$env_dir}"
+  content="${content//__READ_WRITE_PATHS__/$read_write_paths_value}"
   content="${content//__START_COMMAND__/$start_command}"
   content="${content//__HEALTH_CHECK__/}"
   printf '%s\n' "$content" > "$rendered_service"

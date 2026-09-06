@@ -82,14 +82,20 @@ nginx's default site or alter unrelated project configuration.
 
 ## Environment behavior
 
-`PORT` is supplied directly by the systemd unit. An env source is optional. When
-provided, it is copied to a project-specific `/etc` directory with mode `0600`.
-The generated unit uses an optional `EnvironmentFile`, so projects that need no
-env file do not require a placeholder.
+`PORT` is supplied directly by the systemd unit. Use repeatable `--port-env`
+options when an application also expects the port under other environment
+variable names. An env source is optional. When provided, it is copied to a
+project-specific `/etc` directory with mode `0600`. The generated unit uses an
+optional `EnvironmentFile`, so projects that need no env file do not require a
+placeholder.
+
+The service sandbox permits writes to its configuration directory and optional
+application-specific paths under `/var/lib` and `/var/backups`. Additional
+absolute paths can be allowed with repeatable `--read-write-path` options.
 
 Rerunning the installer updates the same project-owned files and restarts only
 the selected service.
 
-The nginx templates allocate 64 KiB upstream and client header buffers because
-the signed, chunked save can produce response and request cookie headers larger
-than nginx's defaults.
+The nginx templates allocate 64 KiB upstream and client header buffers to
+support applications whose request or response headers exceed nginx's defaults,
+including applications that store chunked data in cookies.
